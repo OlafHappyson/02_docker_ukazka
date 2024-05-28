@@ -27,7 +27,7 @@ jobs:
       - name: Build, tag, and push docker image to Amazon ECR Public
         env:
           REGISTRY: ${{ steps.login-ecr-public.outputs.registry }}
-          REGISTRY_ALIAS: robotdreams_docker_ukazka
+          REGISTRY_ALIAS: l7o7j6r9
           REPOSITORY: robotdreams_docker_ukazka
           IMAGE_TAG: ${{ github.sha }}
         run: |
