@@ -118,6 +118,11 @@ jobs:
       runs-on: ubuntu-latest
       needs: deploy-preproduction
       environment: preproduction
+      steps:
+      - name: Deploy to Staging
+        run: |
+          echo "Deploying to staging environment"
+          ssh user@staging-server "docker pull ${{ env.DOCKER_IMAGE }}:staging-latest && docker-compose up -d"
 
           
   deploy-production:
