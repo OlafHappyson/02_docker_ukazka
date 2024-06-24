@@ -10,9 +10,8 @@ env:
   DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/your-app
 
 jobs:
-  build-and-deploy-staging:
+  build-and-test:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -32,15 +31,91 @@ jobs:
           context: .
           push: true
           tags: ${{ env.DOCKER_IMAGE }}:staging-latest
-
+  
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
       - name: Deploy to Staging
         run: |
           echo "Deploying to staging environment"
           ssh user@staging-server "docker pull ${{ env.DOCKER_IMAGE }}:staging-latest && docker-compose up -d"
+  deploy-qa:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Deploy to Staging
+        run: |
+          echo "Deploying to staging environment"
+          ssh user@staging-server "docker pull ${{ env.DOCKER_IMAGE }}:staging-latest && docker-compose up -d"
+          
+  deploy-stage:
+    runs-on: ubuntu-latest
+    needs: deploy-qa
+    steps:
+      - name: Wait for approval
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { createWorkflowDispatch } = require('@octokit/rest');
+            const [owner, repo] = process.env.GITHUB_REPOSITORY.split("/");
+            const workflow_id = process.env.GITHUB_WORKFLOW;
 
+            const octokit = new createWorkflowDispatch({
+              auth: process.env.GITHUB_TOKEN
+            });
+
+            await octokit.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id,
+              ref: 'main',
+              inputs: { stage: 'approval' }
+            });
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Deploy to Staging
+        run: |
+          echo "Deploying to staging environment"
+          ssh user@staging-server "docker pull ${{ env.DOCKER_IMAGE }}:staging-latest && docker-compose up -d"
+  
+  deploy-preproduction:
+    runs-on: ubuntu-latest
+    needs: deploy-stage
+    steps:
+      - name: Wait for approval
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { createWorkflowDispatch } = require('@octokit/rest');
+            const [owner, repo] = process.env.GITHUB_REPOSITORY.split("/");
+            const workflow_id = process.env.GITHUB_WORKFLOW;
+
+            const octokit = new createWorkflowDispatch({
+              auth: process.env.GITHUB_TOKEN
+            });
+
+            await octokit.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id,
+              ref: 'main',
+              inputs: { stage: 'approval' }
+            });
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Deploy to Staging
+        run: |
+          echo "Deploying to staging environment"
+          ssh user@staging-server "docker pull ${{ env.DOCKER_IMAGE }}:staging-latest && docker-compose up -d"
+          
   deploy-production:
     runs-on: ubuntu-latest
-    needs: build-and-deploy-staging
+    needs: deploy-preproduction
     environment: production
 
     steps:
